@@ -206,8 +206,8 @@
             return tomorrow;
         }
         
-        // Show notification - SIMPLIFIED VERSION
-        function showNotification(color) {
+        // Mobile-compatible notification function
+        async function showNotification(color) {
             addDebugLog(`Attempting to show ${color} notification...`);
             
             if (Notification.permission !== 'granted') {
@@ -216,22 +216,63 @@
             }
             
             try {
-                // Create notification directly (no service worker)
+                // Check if we're on mobile (Android Chrome requires service worker)
+                const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                addDebugLog(`Device type: ${isMobile ? 'Mobile' : 'Desktop'}`);
+                
+                if (isMobile && 'serviceWorker' in navigator) {
+                    // Mobile approach: Use service worker
+                    addDebugLog('Using service worker approach for mobile...');
+                    
+                    // Register a minimal service worker
+                    const registration = await navigator.serviceWorker.register(
+                        'data:application/javascript,' + encodeURIComponent(`
+                            self.addEventListener('notificationclick', function(event) {
+                                event.notification.close();
+                                event.waitUntil(clients.openWindow('./'));
+                            });
+                        `)
+                    ).catch(async () => {
+                        // If data: URLs don't work, try without service worker
+                        addDebugLog('Service worker registration failed, trying direct approach...');
+                        return null;
+                    });
+                    
+                    if (registration) {
+                        await registration.showNotification(color, {
+                            body: `${color} period - 4 hour notification`,
+                            tag: 'color-notification',
+                            requireInteraction: true,
+                            vibrate: [200, 100, 200],
+                            icon: `data:image/svg+xml;base64,${btoa(`
+                                <svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+                                    <circle cx="32" cy="32" r="30" fill="${color === 'RED' ? '#f44336' : '#2196f3'}"/>
+                                    <text x="32" y="40" font-family="Arial" font-size="20" fill="white" text-anchor="middle">${color}</text>
+                                </svg>
+                            `)}`
+                        });
+                        addDebugLog('Service worker notification created!');
+                        return;
+                    }
+                }
+                
+                // Desktop approach or fallback: Direct notification
+                addDebugLog('Using direct notification approach...');
                 const notification = new Notification(color, {
                     body: `${color} period - 4 hour notification`,
+                    tag: 'color-notification',
+                    requireInteraction: true,
+                    silent: false,
+                    vibrate: [200, 100, 200],
                     icon: `data:image/svg+xml;base64,${btoa(`
                         <svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
                             <circle cx="32" cy="32" r="30" fill="${color === 'RED' ? '#f44336' : '#2196f3'}"/>
                             <text x="32" y="40" font-family="Arial" font-size="20" fill="white" text-anchor="middle">${color}</text>
                         </svg>
-                    `)}`,
-                    tag: 'color-notification',
-                    requireInteraction: true,
-                    silent: false,
-                    vibrate: [200, 100, 200]
+                    `)}`
                 });
                 
-                addDebugLog(`Notification created successfully!`);
+                addDebugLog('Direct notification created successfully!');
                 
                 notification.onclick = function() {
                     addDebugLog('Notification clicked');
@@ -239,16 +280,17 @@
                     this.close();
                 };
                 
-                notification.onerror = function(error) {
-                    addDebugLog(`Notification error: ${error}`);
-                };
-                
-                notification.onshow = function() {
-                    addDebugLog('Notification shown');
-                };
-                
             } catch (error) {
-                addDebugLog(`Error creating notification: ${error.message}`);
+                addDebugLog(`Error: ${error.message}`);
+                
+                // Last resort: Try basic notification without extras
+                try {
+                    addDebugLog('Trying basic notification...');
+                    const basicNotification = new Notification(color);
+                    addDebugLog('Basic notification worked!');
+                } catch (basicError) {
+                    addDebugLog(`Basic notification also failed: ${basicError.message}`);
+                }
             }
         }
         
