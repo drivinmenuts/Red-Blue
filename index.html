@@ -216,85 +216,46 @@
             }
             
             try {
-                // Check if we're on mobile (Android Chrome requires service worker)
-                const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-                addDebugLog(`Device type: ${isMobile ? 'Mobile' : 'Desktop'}`);
-                
-                if (isMobile && 'serviceWorker' in navigator) {
-                    // Mobile approach: Use service worker
-                    addDebugLog('Using service worker approach for mobile...');
+                // For Android Chrome, we MUST use service worker
+                if ('serviceWorker' in navigator) {
+                    addDebugLog('Registering service worker for notifications...');
                     
-                    // Register a minimal service worker
-                    const registration = await navigator.serviceWorker.register(
-                        'data:application/javascript,' + encodeURIComponent(`
-                            self.addEventListener('notificationclick', function(event) {
-                                event.notification.close();
-                                event.waitUntil(clients.openWindow('./'));
-                            });
-                        `)
-                    ).catch(async () => {
-                        // If data: URLs don't work, try without service worker
-                        addDebugLog('Service worker registration failed, trying direct approach...');
+                    const registration = await navigator.serviceWorker.register('./sw.js').catch(error => {
+                        addDebugLog(`Service worker registration failed: ${error.message}`);
                         return null;
                     });
                     
                     if (registration) {
-                        await registration.showNotification(color, {
-                            body: `${color} period - 4 hour notification`,
-                            tag: 'color-notification',
-                            requireInteraction: true,
-                            vibrate: [200, 100, 200],
-                            sticky: true,
-                            silent: false,
-                            renotify: true,
-                            timestamp: Date.now(),
-                            icon: `data:image/svg+xml;base64,${btoa(`
-                                <svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-                                    <circle cx="32" cy="32" r="30" fill="${color === 'RED' ? '#f44336' : '#2196f3'}"/>
-                                    <text x="32" y="40" font-family="Arial" font-size="20" fill="white" text-anchor="middle">${color}</text>
-                                </svg>
-                            `)}`
-                        });
-                        addDebugLog('Service worker notification created!');
+                        addDebugLog('Service worker registered successfully!');
+                        
+                        // Wait for service worker to be ready
+                        const activeRegistration = await navigator.serviceWorker.ready;
+                        
+                        if (activeRegistration.active) {
+                            // Send message to service worker to show notification
+                            activeRegistration.active.postMessage({
+                                type: 'SHOW_NOTIFICATION',
+                                color: color
+                            });
+                            addDebugLog(`Sent ${color} notification request to service worker`);
+                        } else {
+                            addDebugLog('Service worker not active yet');
+                        }
                         return;
                     }
                 }
                 
-                // Desktop approach or fallback: Direct notification
-                addDebugLog('Using direct notification approach...');
+                // Fallback (shouldn't reach here on Android)
+                addDebugLog('Service worker not available, trying direct...');
                 const notification = new Notification(color, {
-                    body: `${color} period - 4 hour notification`,
+                    body: `${color} period notification`,
                     tag: 'color-notification',
-                    requireInteraction: true,
-                    silent: false,
-                    vibrate: [200, 100, 200],
-                    icon: `data:image/svg+xml;base64,${btoa(`
-                        <svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-                            <circle cx="32" cy="32" r="30" fill="${color === 'RED' ? '#f44336' : '#2196f3'}"/>
-                            <text x="32" y="40" font-family="Arial" font-size="20" fill="white" text-anchor="middle">${color}</text>
-                        </svg>
-                    `)}`
+                    requireInteraction: true
                 });
-                
-                addDebugLog('Direct notification created successfully!');
-                
-                notification.onclick = function() {
-                    addDebugLog('Notification clicked');
-                    window.focus();
-                    this.close();
-                };
+                addDebugLog('Direct notification created (fallback)');
                 
             } catch (error) {
-                addDebugLog(`Error: ${error.message}`);
-                
-                // Last resort: Try basic notification without extras
-                try {
-                    addDebugLog('Trying basic notification...');
-                    const basicNotification = new Notification(color);
-                    addDebugLog('Basic notification worked!');
-                } catch (basicError) {
-                    addDebugLog(`Basic notification also failed: ${basicError.message}`);
-                }
+                addDebugLog(`Final error: ${error.message}`);
             }
         }
         
@@ -435,13 +396,12 @@
             }
         }, 300000); // Every 5 minutes
         
-        // Clean up any existing service workers that might interfere
+        // Initialize service worker for notifications
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                for(let registration of registrations) {
-                    addDebugLog('Unregistering old service worker...');
-                    registration.unregister();
-                }
+            navigator.serviceWorker.register('./sw.js').then(function(registration) {
+                addDebugLog('Service worker registered for app startup');
+            }).catch(function(error) {
+                addDebugLog(`Service worker registration failed at startup: ${error.message}`);
             });
         }
     </script>
