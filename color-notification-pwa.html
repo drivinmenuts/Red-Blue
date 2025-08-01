@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Color Notifications</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#000000">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="Color Notifications">
+    <link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==">
+    
+    <!-- Embedded Manifest -->
+    <link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiQ29sb3IgTm90aWZpY2F0aW9ucyIsInNob3J0X25hbWUiOiJDb2xvck5vdGlmIiwic3RhcnRfdXJsIjoiLiIsImRpc3BsYXkiOiJzdGFuZGFsb25lIiwiYmFja2dyb3VuZF9jb2xvciI6IiMwMDAwMDAiLCJ0aGVtZV9jb2xvciI6IiMwMDAwMDAiLCJpY29ucyI6W3sic3JjIjoiZGF0YTppbWFnZS9wbmc7YmFzZTY0LGlWQk9SdzBLR2dvQUFBQU5TVWhFVWdBQUFBRUFBQUFCQ0FZQUFBQWZGY1NKQUFBQURVbEVRVlI0Mm1OaytNOVFEd0FEaGdHQVdqUjlhd0FBQUFCSVJVNUVUS1FtQ0MiLCJzaXplcyI6IjE5MngxOTIiLCJ0eXBlIjoiaW1hZ2UvcG5nIn1dfQ==">
+    
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f0f0f0;
+            text-align: center;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            max-width: 400px;
+            width: 100%;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        
+        .status {
+            font-size: 18px;
+            margin: 15px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        
+        .red { background: #ffebee; color: #c62828; }
+        .blue { background: #e3f2fd; color: #1565c0; }
+        
+        .next-notification {
+            font-size: 14px;
+            color: #666;
+            margin-top: 20px;
+        }
+        
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+        }
+        
+        button:hover {
+            background: #45a049;
+        }
+        
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .permission-status {
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        
+        .granted { color: #4CAF50; }
+        .denied { color: #f44336; }
+        .default { color: #ff9800; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Color Notifications</h1>
+        
+        <div class="status" id="currentStatus">
+            Loading...
+        </div>
+        
+        <div class="next-notification" id="nextTime">
+            Calculating next notification...
+        </div>
+        
+        <button id="enableBtn" onclick="enableNotifications()">
+            Enable Notifications
+        </button>
+        
+        <button id="testBtn" onclick="testNotification()" style="display:none;">
+            Test Notification
+        </button>
+        
+        <div class="permission-status" id="permissionStatus">
+            Checking notification permissions...
+        </div>
+        
+        <div style="margin-top: 20px; font-size: 12px; color: #888;">
+            <p>Install this app to your home screen for best experience.</p>
+            <p>Notifications every 4 hours: 00:00, 04:00, 08:00, 12:00, 16:00, 20:00</p>
+        </div>
+    </div>
+
+    <script>
+        // Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('data:application/javascript;base64,' + btoa(`
+                self.addEventListener('notificationclick', function(event) {
+                    event.notification.close();
+                    event.waitUntil(
+                        clients.openWindow('/')
+                    );
+                });
+                
+                self.addEventListener('message', function(event) {
+                    if (event.data && event.data.type === 'SHOW_NOTIFICATION') {
+                        self.registration.showNotification(event.data.color, {
+                            body: event.data.color + ' notification',
+                            icon: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+                            badge: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+                            tag: 'color-notification',
+                            requireInteraction: true,
+                            persistent: true
+                        });
+                    }
+                });
+            `))
+            .then(registration => {
+                console.log('Service Worker registered successfully');
+            })
+            .catch(error => {
+                console.log('Service Worker registration failed:', error);
+            });
+        }
+
+        // Get current day color (odd dates = RED, even dates = BLUE)
+        function getCurrentDayColor() {
+            const today = new Date();
+            const dayOfMonth = today.getDate();
+            return (dayOfMonth % 2 === 1) ? 'RED' : 'BLUE';
+        }
+
+        // Get notification times for today (every 4 hours from midnight)
+        function getNotificationTimes() {
+            return [0, 4, 8, 12, 16, 20]; // Hours: 00:00, 04:00, 08:00, 12:00, 16:00, 20:00
+        }
+
+        // Get next notification time
+        function getNextNotificationTime() {
+            const now = new Date();
+            const currentHour = now.getHours();
+            const currentMinute = now.getMinutes();
+            const times = getNotificationTimes();
+            
+            // Find next notification time today
+            for (let hour of times) {
+                if (currentHour < hour || (currentHour === hour && currentMinute < 0)) {
+                    const nextTime = new Date();
+                    nextTime.setHours(hour, 0, 0, 0);
+                    return nextTime;
+                }
+            }
+            
+            // If no more times today, get first time tomorrow
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            tomorrow.setHours(0, 0, 0, 0);
+            return tomorrow;
+        }
+
+        // Show notification
+        function showNotification(color) {
+            if (Notification.permission === 'granted' && 'serviceWorker' in navigator) {
+                navigator.serviceWorker.ready.then(registration => {
+                    navigator.serviceWorker.controller?.postMessage({
+                        type: 'SHOW_NOTIFICATION',
+                        color: color
+                    });
+                });
+            }
+        }
+
+        // Schedule next notification
+        function scheduleNextNotification() {
+            const nextTime = getNextNotificationTime();
+            const now = new Date();
+            const delay = nextTime.getTime() - now.getTime();
+            
+            console.log(`Next notification in ${Math.round(delay/1000/60)} minutes at ${nextTime.toLocaleString()}`);
+            
+            setTimeout(() => {
+                const color = getCurrentDayColor();
+                showNotification(color);
+                scheduleNextNotification(); // Schedule the next one
+            }, delay);
+            
+            updateNextTimeDisplay(nextTime);
+        }
+
+        // Update UI
+        function updateStatus() {
+            const color = getCurrentDayColor();
+            const statusEl = document.getElementById('currentStatus');
+            statusEl.textContent = `Today is a ${color} day`;
+            statusEl.className = `status ${color.toLowerCase()}`;
+        }
+
+        function updateNextTimeDisplay(nextTime) {
+            const nextTimeEl = document.getElementById('nextTime');
+            nextTimeEl.textContent = `Next notification: ${nextTime.toLocaleString()}`;
+        }
+
+        function updatePermissionStatus() {
+            const statusEl = document.getElementById('permissionStatus');
+            const enableBtn = document.getElementById('enableBtn');
+            const testBtn = document.getElementById('testBtn');
+            
+            switch (Notification.permission) {
+                case 'granted':
+                    statusEl.textContent = '✓ Notifications enabled';
+                    statusEl.className = 'permission-status granted';
+                    enableBtn.style.display = 'none';
+                    testBtn.style.display = 'inline-block';
+                    break;
+                case 'denied':
+                    statusEl.textContent = '✗ Notifications blocked';
+                    statusEl.className = 'permission-status denied';
+                    enableBtn.disabled = true;
+                    enableBtn.textContent = 'Notifications Blocked';
+                    break;
+                default:
+                    statusEl.textContent = '⚠ Notifications not enabled';
+                    statusEl.className = 'permission-status default';
+                    break;
+            }
+        }
+
+        // Enable notifications
+        async function enableNotifications() {
+            try {
+                const permission = await Notification.requestPermission();
+                updatePermissionStatus();
+                
+                if (permission === 'granted') {
+                    scheduleNextNotification();
+                }
+            } catch (error) {
+                console.error('Error requesting notification permission:', error);
+            }
+        }
+
+        // Test notification
+        function testNotification() {
+            const color = getCurrentDayColor();
+            showNotification(color);
+        }
+
+        // Initialize app
+        function initApp() {
+            updateStatus();
+            updatePermissionStatus();
+            
+            if (Notification.permission === 'granted') {
+                scheduleNextNotification();
+            }
+            
+            // Update status every minute
+            setInterval(updateStatus, 60000);
+        }
+
+        // Start app when page loads
+        document.addEventListener('DOMContentLoaded', initApp);
+        
+        // Wake up and check when page becomes visible
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) {
+                updateStatus();
+                if (Notification.permission === 'granted') {
+                    scheduleNextNotification();
+                }
+            }
+        });
+    </script>
+</body>
+</html>
