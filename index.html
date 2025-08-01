@@ -244,6 +244,10 @@
                             tag: 'color-notification',
                             requireInteraction: true,
                             vibrate: [200, 100, 200],
+                            sticky: true,
+                            silent: false,
+                            renotify: true,
+                            timestamp: Date.now(),
                             icon: `data:image/svg+xml;base64,${btoa(`
                                 <svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
                                     <circle cx="32" cy="32" r="30" fill="${color === 'RED' ? '#f44336' : '#2196f3'}"/>
